@@ -69,16 +69,89 @@ def detect_emotion():
         )
         resp.raise_for_status()
         result = resp.json()["choices"][0]["message"]["content"].strip()
-        
+
         # 喜怒哀楽のどれかを判定
         emotion = None
         for key in EMOJI_MAP:
             if key in result:
                 emotion = key
                 break
-        
+
         emoji = EMOJI_MAP.get(emotion, "😐")
         return jsonify({"emotion": emotion, "emoji": emoji, "raw": result})
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        print(f"[DEBUG] Error: {e}\n{error_detail}", flush=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/game")
+def game():
+    return render_template("game.html")
+
+
+@app.route("/game/score", methods=["POST"])
+def game_score():
+    try:
+        data = request.get_json()
+        game_data = data.get("gameData", {})
+
+        # ゲームデータをJSON文字列化
+        import json
+        game_json = json.dumps(game_data, ensure_ascii=False, indent=2)
+
+        # Sakura LLMで演技力採点
+        messages = [
+            {
+                "role": "user",
+                "content": f"""以下は1分間の表情演技ゲームの記録データです。このプレイヤーの演技力を採点し、コメントをください。
+
+【ゲームデータ】
+{game_json}
+
+【採点基準】
+- 目標表情への合致率
+- 反応速度（検出までの時間）
+- 安定性（継続して表情を維持できたか）
+- 達成度（目標時間内にどれだけ表現できたか）
+
+【出力形式】
+以下のJSON形式で返してください：
+{{
+  "score": 採点（0-100の整数）,
+  "rank": "S/A/B/C/D",
+  "comment": "演技力へのコメント（日本語、100文字程度）",
+  "highlights": ["良かった点1", "良かった点2"]
+}}
+
+JSONのみを出力してください。"""
+            }
+        ]
+
+        resp = requests.post(
+            f"{API_BASE}/chat/completions",
+            headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"},
+            json={
+                "model": "preview/Qwen3-VL-30B-A3B-Instruct",
+                "messages": messages,
+                "max_tokens": 500,
+                "stream": False,
+                "temperature": 0.7,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        result = resp.json()["choices"][0]["message"]["content"].strip()
+
+        # JSONを抽出
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', result)
+        if json_match:
+            score_data = json.loads(json_match.group())
+            return jsonify(score_data)
+        else:
+            return jsonify({"score": 50, "rank": "B", "comment": result[:100], "highlights": []})
+
     except Exception as e:
         error_detail = traceback.format_exc()
         print(f"[DEBUG] Error: {e}\n{error_detail}", flush=True)

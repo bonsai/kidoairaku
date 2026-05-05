@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>演技力採点 - 喜怒哀楽</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}">
+</head>
+<body>
+    <div class="container" id="gameContainer">
+        <h1>演技力採点ゲーム</h1>
+        <p class="subtitle">1分間で表情を演じて採点！</p>
+
+        <div class="game-info">
+            <div class="target-emotion">
+                <div class="target-label">目標表情</div>
+                <div class="target-display" id="targetEmotion">-</div>
+                <div class="target-emoji" id="targetEmoji">😐</div>
+            </div>
+            <div class="timer">
+                <div class="timer-label">残り時間</div>
+                <div class="timer-display" id="timer">60</div>
+                <div class="timer-unit">秒</div>
+            </div>
+        </div>
+
+        <button class="start-btn" id="startGameBtn" onclick="startGame()">ゲーム開始</button>
+
+        <div class="camera-area" id="gameCameraArea">
+            <video id="gameCameraPreview" autoplay playsinline></video>
+            <div class="detection-result" id="detectionResult">
+                <div class="detected-emotion" id="detectedEmotion">-</div>
+                <div class="detected-emoji" id="detectedEmoji">😐</div>
+                <div class="match-status" id="matchStatus">待機中</div>
+            </div>
+        </div>
+
+        <canvas id="gameCaptureCanvas" style="display:none;"></canvas>
+
+        <div class="game-stats" id="gameStats">
+            <div class="stat-item">
+                <div class="stat-label">合致回数</div>
+                <div class="stat-value" id="matchCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">検出回数</div>
+                <div class="stat-value" id="detectCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">合致率</div>
+                <div class="stat-value" id="matchRate">0%</div>
+            </div>
+        </div>
+
+        <div class="result-overlay" id="gameResultOverlay">
+            <h2>演技力結果</h2>
+            <div class="score-display">
+                <div class="score-number" id="scoreNumber">-</div>
+                <div class="score-rank" id="scoreRank">-</div>
+            </div>
+            <div class="score-comment" id="scoreComment"></div>
+            <div class="highlights" id="highlights"></div>
+            <button class="retry-btn" onclick="location.reload()">もう一度</button>
+            <button class="retry-btn" onclick="window.location.href='/'">トップに戻る</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='game.js') }}"></script>
+</body>
+</html>
