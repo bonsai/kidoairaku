@@ -1,0 +1,26 @@
+.onboarding-steps {
+    margin: 40px 0;
+}
+
+.step {
+    display: none;
+    text-align: center;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.step.active {
+    display: block;
+}
+
+.step-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: floatSakura 2s ease-in-out infinite;
+}
+
+.step-text {
+    font-size: 22px;
+    color: #b8860b;
+    font-weight: bold;
+    line-height: 1.6;
+}

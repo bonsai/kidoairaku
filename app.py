@@ -110,6 +110,10 @@ def game():
 def test():
     return render_template("test.html")
 
+@app.route("/onboarding")
+def onboarding():
+    return render_template("onboarding.html")
+
 @app.route("/moheji")
 def moheji():
     return render_template("moheji.html")

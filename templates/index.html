@@ -3,35 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>喜怒哀楽 - 表情判定</title>
+    <title>喜怒哀楽 - 演技でお金稼ぎ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <!-- 背景の飾り -->
-    <div style="position: fixed; top: -50px; left: -50px; font-size: 40px; opacity: 0.2; animation: floatSakura 8s ease-in-out infinite;">🎉</div>
-    <div style="position: fixed; top: 20%; right: -30px; font-size: 30px; opacity: 0.15; animation: floatSakura 6s ease-in-out infinite 1s;">😊</div>
-    <div style="position: fixed; bottom: 10%; left: 5%; font-size: 35px; opacity: 0.18; animation: floatSakura 7s ease-in-out infinite 2s;">🎊</div>
-    <div style="position: fixed; bottom: -40px; right: 30%; font-size: 45px; opacity: 0.15; animation: floatSakura 9s ease-in-out infinite 3s;">🎉</div>
-
     <div class="container" id="mainContainer">
         <h1>喜怒哀楽</h1>
-        <p class="subtitle">表情で遊ぶ2つのモード</p>
-
-        <div class="mode-select">
-            <button class="mode-btn test-btn" onclick="location.href='/test'">
-                <div class="mode-icon">😊</div>
-                <div class="mode-title">テストモード</div>
-                <div class="mode-desc">顔に絵文字が重なる<br>表情で絵文字が変わる</div>
-            </button>
-            <button class="mode-btn game-btn" onclick="location.href='/game'">
-                <div class="mode-icon">🎮</div>
-                <div class="mode-title">ゲームモード</div>
-                <div class="mode-desc">30秒で表情維持<br>合致率で採点</div>
-            </button>
+        <p class="subtitle">演技でお金を稼ごう！</p>
+        <button class="start-btn" onclick="startGame()">ゲームスタート</button>
+        <div class="coin-display" id="totalCoins">
+            💰 <span id="coinCount">0</span> コイン
         </div>
     </div>
 
     <script>
+    function startGame() {
+        const hasSeenOnboarding = localStorage.getItem('kidoairaku_onboarding');
+        if (!hasSeenOnboarding) {
+            window.location.href = '/onboarding';
+        } else {
+            window.location.href = '/game';
+        }
+    }
+
+    // コイン表示
+    function updateCoinDisplay() {
+        const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
+        document.getElementById('coinCount').textContent = coins;
+    }
+    updateCoinDisplay();
     </script>
 </body>
 </html>

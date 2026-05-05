@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
         detectCount: 0,
         totalMatchTime: 0
     };
-    let audioContext = null;
     let overlayCtx = null;
+    let coinSound = null;
 
     const EMOJI_MAP = {
         "喜": "😊",
@@ -25,22 +25,48 @@ document.addEventListener('DOMContentLoaded', function() {
         "楽": "楽"
     };
 
-    function playMatchSound() {
+    // コイン音初期化
+    function initCoinSound() {
+        coinSound = new Audio('/static/coin.mp3');
+        coinSound.volume = 0.5;
+    }
+
+    function playCoinSound() {
         try {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            oscillator.frequency.value = 800;
-            gainNode.gain.value = 0.3;
-            oscillator.start();
-            oscillator.stop(audioContext.currentTime + 0.1);
+            if (!coinSound) initCoinSound();
+            coinSound.currentTime = 0;
+            coinSound.play();
         } catch (e) {
-            console.error('Sound error:', e);
+            // Web Audio APIフォールバック
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 1200;
+                gainNode.gain.value = 0.3;
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (e2) {
+                console.error('Sound error:', e2);
+            }
         }
+    }
+
+    function addCoin() {
+        const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
+        const newCoins = coins + 1;
+        localStorage.setItem('kidoairaku_coins', newCoins.toString());
+        updateCoinDisplay();
+        playCoinSound();
+    }
+
+    function updateCoinDisplay() {
+        const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
+        const el = document.getElementById('coinCount');
+        if (el) el.textContent = coins;
     }
 
     async function initCamera() {
@@ -127,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('detectedEmoji').textContent = data.emoji || '😐';
 
                     const isMatch = detected === targetEmotion;
-                    document.getElementById('matchStatus').textContent = isMatch ? '合致！' : '違う...';
+                    document.getElementById('matchStatus').textContent = isMatch ? '合致！+1💰' : '違う...';
                     document.getElementById('matchStatus').className = 'match-status ' + (isMatch ? 'match' : 'no-match');
 
                     const detection = {
@@ -141,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (isMatch) {
                         gameData.matchCount++;
                         gameData.totalMatchTime += 1;
-                        playMatchSound();
+                        addCoin();
                     }
 
                     document.getElementById('detectCount').textContent = gameData.detectCount;
@@ -209,4 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('採点エラー: ' + err.message);
         }
     }
+
+    updateCoinDisplay();
 });

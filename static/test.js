@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let facingMode = 'user';
     let overlayCtx = null;
     let detectInterval = null;
+    let testTimer = null;
+    let isOnboarding = new URLSearchParams(window.location.search).get('mode') === 'onboarding';
 
     const EMOJI_MAP = {
         "喜": "😊",
@@ -32,6 +34,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 canvas.style.height = video.offsetHeight + 'px';
                 overlayCtx = canvas.getContext('2d');
             });
+
+            // オンボーディングモードは10秒で終了
+            if (isOnboarding) {
+                setTimeout(() => {
+                    endTest();
+                }, 10000);
+            }
 
             detectInterval = setInterval(detectAndOverlay, 1500);
         } catch (err) {
@@ -84,6 +93,16 @@ document.addEventListener('DOMContentLoaded', function() {
         overlayCtx.textAlign = 'center';
         overlayCtx.textBaseline = 'middle';
         overlayCtx.fillText(emoji, canvas.width / 2, canvas.height / 2);
+    }
+
+    function endTest() {
+        clearInterval(detectInterval);
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        if (isOnboarding) {
+            window.location.href = '/game';
+        }
     }
 
     initCamera();

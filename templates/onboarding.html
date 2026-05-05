@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使い方 - 喜怒哀楽</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='onboarding.css') }}">
+</head>
+<body>
+    <div class="container" id="onboardingContainer">
+        <h1>使い方</h1>
+        <div class="onboarding-steps" id="steps">
+            <div class="step active" id="step1">
+                <div class="step-icon">🎮</div>
+                <div class="step-text">指令の表情になろう！</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-icon">😊😠😢楽</div>
+                <div class="step-text">喜・怒・哀・楽の4つ</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-icon">⏱️</div>
+                <div class="step-text">30秒間維持できたら勝利</div>
+            </div>
+            <div class="step" id="step4">
+                <div class="step-icon">💰</div>
+                <div class="step-text">合致するたびコインゲット！</div>
+            </div>
+        </div>
+        <button class="start-btn" id="nextBtn" onclick="nextStep()">次へ</button>
+    </div>
+
+    <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+
+    function nextStep() {
+        document.getElementById('step' + (currentStep + 1)).classList.remove('active');
+        currentStep++;
+        if (currentStep >= totalSteps) {
+            localStorage.setItem('kidoairaku_onboarding', 'done');
+            window.location.href = '/test?mode=onboarding';
+        } else {
+            document.getElementById('step' + (currentStep + 1)).classList.add('active');
+            if (currentStep === totalSteps - 1) {
+                document.getElementById('nextBtn').textContent = 'テストを始める';
+            }
+        }
+    }
+    </script>
+</body>
+</html>

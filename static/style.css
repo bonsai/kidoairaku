@@ -373,6 +373,17 @@ h1 {
     box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
 }
 
+.coin-display {
+    font-size: 24px;
+    color: #b8860b;
+    font-weight: bold;
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 215, 0, 0.2);
+    border-radius: 15px;
+    border: 2px solid #ffd700;
+}
+
 /* スマホ最適化 */
 @media (max-width: 480px) {
     body {
