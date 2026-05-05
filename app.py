@@ -7,6 +7,7 @@ import base64
 import mimetypes
 import traceback
 import requests
+import json
 from flask import Flask, request, render_template, jsonify
 from dotenv import load_dotenv
 
@@ -19,6 +20,22 @@ if not TOKEN:
     print("Warning: SAKURA_API_TOKEN not set", file=sys.stderr)
 
 API_BASE = "https://api.ai.sakura.ad.jp/v1"
+
+# ランキングデータファイル
+RANKING_FILE = "ranking.json"
+
+def load_ranking():
+    if os.path.exists(RANKING_FILE):
+        try:
+            with open(RANKING_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_ranking(data):
+    with open(RANKING_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 # 喜怒哀楽 → 絵文字マップ
 EMOJI_MAP = {
@@ -88,6 +105,14 @@ def detect_emotion():
 @app.route("/game")
 def game():
     return render_template("game.html")
+
+@app.route("/test")
+def test():
+    return render_template("test.html")
+
+@app.route("/moheji")
+def moheji():
+    return render_template("moheji.html")
 
 
 @app.route("/game/score", methods=["POST"])

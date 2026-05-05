@@ -15,40 +15,23 @@
 
     <div class="container" id="mainContainer">
         <h1>喜怒哀楽</h1>
-        <p class="subtitle">カメラで表情を判定・絵文字が変わる</p>
+        <p class="subtitle">表情で遊ぶ2つのモード</p>
 
-        <button class="start-btn" id="startBtn" onclick="startCamera()">カメラを起動</button>
-
-        <div class="camera-area" id="cameraArea">
-            <video id="cameraPreview" autoplay playsinline></video>
-            <button class="switch-btn" onclick="switchCamera()">切替</button>
-            <div class="capture-btn" onclick="capture()"></div>
-        </div>
-
-        <canvas id="captureCanvas" style="display:none;"></canvas>
-    </div>
-
-    <!-- ローディング画面 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="emoji-beat" id="loadingEmoji">😐</div>
-        <div class="loading-text" id="loadingText">診断中…</div>
-        <div class="progress-bar">
-            <div class="progress-fill"></div>
+        <div class="mode-select">
+            <button class="mode-btn test-btn" onclick="location.href='/test'">
+                <div class="mode-icon">😊</div>
+                <div class="mode-title">テストモード</div>
+                <div class="mode-desc">顔に絵文字が重なる<br>表情で絵文字が変わる</div>
+            </button>
+            <button class="mode-btn game-btn" onclick="location.href='/game'">
+                <div class="mode-icon">🎮</div>
+                <div class="mode-title">ゲームモード</div>
+                <div class="mode-desc">30秒で表情維持<br>合致率で採点</div>
+            </button>
         </div>
     </div>
 
-    <!-- 結果画面 -->
-    <div class="result-overlay" id="resultOverlay">
-        <div style="font-size: 60px; margin-bottom: 20px; animation: floatSakura 2s ease-in-out infinite;" id="resultEmoji">😐</div>
-        <div class="result-emotion" id="resultEmotion">-</div>
-        <div class="result-text">の表情です</div>
-        <div style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-            <button class="retry-btn" onclick="retry()">もう一度</button>
-            <button class="retry-btn" onclick="shareTwitter()" style="background: #1DA1F2; border-color: #1DA1F2;">Twitterでシェア</button>
-            <button class="retry-btn" onclick="copyResult()" style="background: #6c5ce7; border-color: #6c5ce7;">コピー</button>
-        </div>
-    </div>
-
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+    </script>
 </body>
 </html>

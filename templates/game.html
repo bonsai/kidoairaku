@@ -10,7 +10,7 @@
 <body>
     <div class="container" id="gameContainer">
         <h1>演技力採点ゲーム</h1>
-        <p class="subtitle">1分間で表情を演じて採点！</p>
+        <p class="subtitle">30秒で表情を維持して採点！</p>
 
         <div class="game-info">
             <div class="target-emotion">
@@ -20,20 +20,26 @@
             </div>
             <div class="timer">
                 <div class="timer-label">残り時間</div>
-                <div class="timer-display" id="timer">60</div>
+                <div class="timer-display" id="timer">30</div>
                 <div class="timer-unit">秒</div>
             </div>
         </div>
 
-        <button class="start-btn" id="startGameBtn" onclick="startGame()">ゲーム開始</button>
-
         <div class="camera-area" id="gameCameraArea">
             <video id="gameCameraPreview" autoplay playsinline></video>
+            <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
             <div class="detection-result" id="detectionResult">
                 <div class="detected-emotion" id="detectedEmotion">-</div>
                 <div class="detected-emoji" id="detectedEmoji">😐</div>
                 <div class="match-status" id="matchStatus">待機中</div>
             </div>
+        </div>
+
+        <div class="sns-icons">
+            <a href="https://twitter.com/intent/tweet?text=喜怒哀楽で演技力採点！&url=https://kidoairaku.onrender.com" target="_blank" class="sns-icon twitter">Twitter</a>
+            <a href="#" class="sns-icon pixiv">Pixiv</a>
+            <a href="#" class="sns-icon instagram">Insta</a>
+            <a href="#" class="sns-icon youtube">YouTube</a>
         </div>
 
         <canvas id="gameCaptureCanvas" style="display:none;"></canvas>

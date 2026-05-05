@@ -1,0 +1,70 @@
+#mohejiCameraArea {
+    display: none;
+    position: relative;
+    margin: 20px auto;
+    max-width: 360px;
+    aspect-ratio: 9/16;
+    max-height: 80vh;
+}
+
+#mohejiCameraArea.show {
+    display: block;
+}
+
+#mohejiCameraPreview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
+}
+
+.moheji-overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.moheji-status {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 16px;
+}
+
+#mohejiCameraArea.show {
+    display: block;
+}
+
+#mohejiCameraPreview {
+    width: 100%;
+    border-radius: 15px;
+}
+
+.moheji-overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.moheji-status {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 16px;
+}

@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let stream = null;
     let facingMode = 'user';
     let gameActive = false;
-    let timeLeft = 60;
+    let timeLeft = 30;
     let timerInterval = null;
     let detectInterval = null;
     let targetEmotion = null;
@@ -12,8 +12,11 @@ document.addEventListener('DOMContentLoaded', function() {
         targetEmotion: null,
         detections: [],
         matchCount: 0,
-        detectCount: 0
+        detectCount: 0,
+        totalMatchTime: 0
     };
+    let audioContext = null;
+    let overlayCtx = null;
 
     const EMOJI_MAP = {
         "喜": "😊",
@@ -22,26 +25,55 @@ document.addEventListener('DOMContentLoaded', function() {
         "楽": "楽"
     };
 
-    window.startGame = async function() {
-        document.getElementById('startGameBtn').style.display = 'none';
-        document.getElementById('gameCameraArea').classList.add('show');
+    function playMatchSound() {
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.value = 800;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.error('Sound error:', e);
+        }
+    }
 
-        // カメラ起動
+    async function initCamera() {
         try {
             stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
             });
             const video = document.getElementById('gameCameraPreview');
+            const canvas = document.getElementById('overlayCanvas');
             video.srcObject = stream;
             if (facingMode === 'user') {
                 video.style.transform = 'scaleX(-1)';
+                canvas.style.transform = 'scaleX(-1)';
             }
+            document.getElementById('gameCameraArea').classList.add('show');
+
+            video.addEventListener('loadedmetadata', () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.style.width = video.offsetWidth + 'px';
+                canvas.style.height = video.offsetHeight + 'px';
+                overlayCtx = canvas.getContext('2d');
+            });
+
+            startGame();
         } catch (err) {
             alert('カメラが起動できません: ' + err.message);
-            return;
         }
+    }
 
-        // 目標表情をランダム選択
+    initCamera();
+
+    async function startGame() {
         const emotions = Object.keys(EMOJI_MAP);
         targetEmotion = emotions[Math.floor(Math.random() * emotions.length)];
         document.getElementById('targetEmotion').textContent = targetEmotion;
@@ -50,9 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
         gameData.targetEmotion = targetEmotion;
         gameData.startTime = Date.now();
         gameActive = true;
-        timeLeft = 60;
+        timeLeft = 30;
 
-        // タイマー開始
         timerInterval = setInterval(() => {
             timeLeft--;
             document.getElementById('timer').textContent = timeLeft;
@@ -61,9 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 1000);
 
-        // 表情検出開始（2秒ごと）
-        detectInterval = setInterval(detectExpression, 2000);
-        // 最初の検出
+        detectInterval = setInterval(detectExpression, 1000);
         setTimeout(detectExpression, 500);
     }
 
@@ -101,7 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('matchStatus').textContent = isMatch ? '合致！' : '違う...';
                     document.getElementById('matchStatus').className = 'match-status ' + (isMatch ? 'match' : 'no-match');
 
-                    // データ記録
                     const detection = {
                         time: Date.now() - gameData.startTime,
                         target: targetEmotion,
@@ -110,18 +138,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                     gameData.detections.push(detection);
                     gameData.detectCount++;
-                    if (isMatch) gameData.matchCount++;
+                    if (isMatch) {
+                        gameData.matchCount++;
+                        gameData.totalMatchTime += 1;
+                        playMatchSound();
+                    }
 
-                    // 統計更新
                     document.getElementById('detectCount').textContent = gameData.detectCount;
                     document.getElementById('matchCount').textContent = gameData.matchCount;
                     const rate = gameData.detectCount > 0 ? Math.round((gameData.matchCount / gameData.detectCount) * 100) : 0;
                     document.getElementById('matchRate').textContent = rate + '%';
+
+                    drawEmojiOnFace(detected);
                 }
             } catch (err) {
                 console.error('検出エラー:', err);
             }
         }, 'image/jpeg', 0.9);
+    }
+
+    function drawEmojiOnFace(emotion) {
+        if (!overlayCtx) return;
+        const canvas = document.getElementById('overlayCanvas');
+        overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
+        const emoji = EMOJI_MAP[emotion] || '😐';
+        overlayCtx.font = '120px serif';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.textBaseline = 'middle';
+        overlayCtx.fillText(emoji, canvas.width / 2, canvas.height / 2);
     }
 
     async function endGame() {
@@ -136,7 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('gameCameraArea').classList.remove('show');
         document.getElementById('gameStats').style.display = 'none';
 
-        // ゲームデータをサーバーに送信して採点
         gameData.endTime = Date.now();
 
         try {
@@ -147,7 +190,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
 
-            // 結果表示
             document.getElementById('scoreNumber').textContent = result.score || '-';
             document.getElementById('scoreRank').textContent = result.rank || '-';
             document.getElementById('scoreComment').textContent = result.comment || '';

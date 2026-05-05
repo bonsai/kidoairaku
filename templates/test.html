@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テストモード - 喜怒哀楽</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='test.css') }}">
+</head>
+<body>
+    <div class="container" id="testContainer">
+        <h1>テストモード</h1>
+        <p class="subtitle">顔に絵文字が重なる！表情で変わる</p>
+
+        <div class="camera-area show" id="testCameraArea">
+            <video id="testCameraPreview" autoplay playsinline></video>
+            <canvas id="faceOverlayCanvas" class="overlay-canvas"></canvas>
+            <div class="detection-info" id="detectionInfo">
+                <div class="detected-emotion" id="detectedEmotion">-</div>
+                <div class="detected-emoji" id="detectedEmoji">😐</div>
+            </div>
+        </div>
+
+        <button class="retry-btn" onclick="window.location.href='/'">トップに戻る</button>
+    </div>
+
+    <script src="{{ url_for('static', filename='test.js') }}"></script>
+</body>
+</html>
