@@ -123,7 +123,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showResult(data) {
         const overlay = document.getElementById('resultOverlay');
-        resultEmoji.textContent = data.emoji || '😐';
+        // 楽は絵文字ではなく汉字で表示
+        if (data.emotion === '楽') {
+            resultEmoji.textContent = '楽';
+            resultEmoji.style.fontSize = '120px';
+            resultEmoji.style.fontFamily = '"Noto Sans JP", sans-serif';
+        } else {
+            resultEmoji.textContent = data.emoji || '😐';
+            resultEmoji.style.fontSize = '';
+            resultEmoji.style.fontFamily = '';
+        }
         resultEmotion.textContent = data.emotion || '-';
         overlay.classList.add('show');
     }
