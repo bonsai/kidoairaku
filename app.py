@@ -8,6 +8,7 @@ import mimetypes
 import traceback
 import requests
 import json
+import re
 from flask import Flask, request, render_template, jsonify, make_response
 from dotenv import load_dotenv
 
@@ -138,7 +139,6 @@ def game_score():
         game_data = data.get("gameData", {})
 
         # ゲームデータをJSON文字列化
-        import json
         game_json = json.dumps(game_data, ensure_ascii=False, indent=2)
 
         # Sakura LLMで演技力採点
@@ -185,7 +185,6 @@ JSONのみを出力してください。"""
         result = resp.json()["choices"][0]["message"]["content"].strip()
 
         # JSONを抽出
-        import re
         json_match = re.search(r'\{[\s\S]*\}', result)
         if json_match:
             score_data = json.loads(json_match.group())
