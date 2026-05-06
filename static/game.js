@@ -72,7 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function initCamera() {
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+                video: { 
+                    facingMode: facingMode, 
+                    width: { ideal: 1280, max: 1280 }, 
+                    height: { ideal: 720, max: 720 }
+                }
             });
             const video = document.getElementById('gameCameraPreview');
             const canvas = document.getElementById('overlayCanvas');
@@ -127,14 +131,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const video = document.getElementById('gameCameraPreview');
         const canvas = document.getElementById('gameCaptureCanvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        
+        // リサイズ：最大 640x480 に抑える
+        const maxWidth = 640;
+        const maxHeight = 480;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        
+        if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.floor(width * ratio);
+            height = Math.floor(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (facingMode === 'user') {
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
         }
-        ctx.drawImage(video, 0, 0);
+        ctx.drawImage(video, 0, 0, width, height);
 
         canvas.toBlob(async function(blob) {
             const formData = new FormData();
@@ -179,8 +196,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (err) {
                 console.error('検出エラー:', err);
+                // エラー時も続行
             }
-        }, 'image/jpeg', 0.9);
+        }, 'image/jpeg', 0.7); // 圧縮品質を 0.7 に低下（サイズ削減）
     }
 
     function drawEmojiOnFace(emotion) {

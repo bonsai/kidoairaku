@@ -8,12 +8,24 @@ import mimetypes
 import traceback
 import requests
 import json
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, make_response
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# キャッシュヘッダーを追加するミドルウェア
+@app.after_request
+def add_cache_headers(response):
+    """静的ファイルに強力なキャッシュヘッダーを追加"""
+    if request.path.startswith('/static/'):
+        # 静的ファイルは 1 年間キャッシュ
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif request.path in ['/', '/game', '/onboarding', '/moheji', '/test']:
+        # HTML ページは短時間キャッシュ（5 分）
+        response.headers['Cache-Control'] = 'public, max-age=300'
+    return response
 
 TOKEN = os.getenv("SAKURA_API_TOKEN", "")
 if not TOKEN:
