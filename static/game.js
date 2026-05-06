@@ -1,319 +1,368 @@
-document.addEventListener('DOMContentLoaded', function() {
-    let stream = null;
-    let facingMode = 'user';
-    let gameActive = false;
-    let timeLeft = 30;
-    let timerInterval = null;
-    let detectInterval = null;
-    let targetEmotion = null;
-    let gameData = {
-        startTime: null,
-        endTime: null,
-        targetEmotion: null,
-        detections: [],
-        matchCount: 0,
-        detectCount: 0,
-        totalMatchTime: 0
+// ===== 設定 =====
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+const GAME_DURATION = 30;          // 秒
+const EMOTION_INTERVAL = 3000;     // 3秒ごとに絵文字切替
+const DETECTION_INTERVAL = 200;    // 0.2秒ごとに検出
+const MATCH_FRAMES = 2;            // 何フレーム連続で合致したらコイン加算
+const COINS_PER_MATCH = 10;        // 合致1回あたりのコイン
+
+const EMOTIONS = [
+  { id: 'happy',     label: '喜',  emoji: '😄', threshold: 0.5 },
+  { id: 'angry',     label: '怒',  emoji: '😠', threshold: 0.4 },
+  { id: 'sad',       label: '哀',  emoji: '😢', threshold: 0.3 },
+  { id: 'surprised', label: '楽',  emoji: '😲', threshold: 0.4 },
+  { id: 'fearful',   label: '驚',  emoji: '😱', threshold: 0.3 },
+  { id: 'disgusted', label: '嫌',  emoji: '🤢', threshold: 0.3 },
+  { id: 'neutral',   label: '無',  emoji: '😐', threshold: 0.6 },
+];
+
+// ===== 状態 =====
+let gameState = {
+  phase: 'init',       // init | loading | ready | playing | result
+  coins: 0,
+  matchCount: 0,
+  detectCount: 0,
+  consecutiveMatch: 0,
+  targetEmotion: null,
+  timeLeft: GAME_DURATION,
+  stream: null,
+  timerInterval: null,
+  emotionInterval: null,
+  detectionInterval: null,
+};
+
+// ===== DOM参照 =====
+const $ = id => document.getElementById(id);
+const els = {
+  coinCount:        $('coinCount'),
+  targetEmotion:    $('targetEmotion'),
+  targetEmoji:      $('targetEmoji'),
+  timer:            $('timer'),
+  cameraArea:       $('gameCameraArea'),
+  video:            $('gameCameraPreview'),
+  overlayCanvas:    $('overlayCanvas'),
+  detectedEmotion:  $('detectedEmotion'),
+  detectedEmoji:    $('detectedEmoji'),
+  matchStatus:      $('matchStatus'),
+  matchCount:       $('matchCount'),
+  detectCount:      $('detectCount'),
+  matchRate:        $('matchRate'),
+  resultOverlay:    $('gameResultOverlay'),
+  scoreNumber:      $('scoreNumber'),
+  scoreRank:        $('scoreRank'),
+  scoreComment:     $('scoreComment'),
+  highlights:       $('highlights'),
+};
+
+// ===== モデルロード =====
+async function loadModels() {
+  setPhase('loading');
+  showStatus('モデルを読み込み中…');
+
+  try {
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+    ]);
+    setPhase('ready');
+    startCamera();
+  } catch (err) {
+    console.error('モデルロードエラー:', err);
+    showStatus('モデルの読み込みに失敗しました。ページを再読み込みしてください。');
+  }
+}
+
+// ===== カメラ起動 =====
+async function startCamera() {
+  try {
+    gameState.stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+    });
+    els.video.srcObject = gameState.stream;
+    els.video.onloadedmetadata = () => {
+      els.cameraArea.classList.add('show');
+      resizeOverlay();
+      startGame();
     };
-    let overlayCtx = null;
-    let coinSound = null;
+  } catch (err) {
+    console.error('カメラエラー:', err);
+    showStatus('カメラへのアクセスを許可してください。');
+  }
+}
 
-    const EMOJI_MAP = {
-        "喜": "😊",
-        "怒": "😠",
-        "哀": "😢",
-        "楽": "楽"
-    };
+function resizeOverlay() {
+  const canvas = els.overlayCanvas;
+  canvas.width  = els.video.videoWidth;
+  canvas.height = els.video.videoHeight;
+  canvas.style.width  = els.video.offsetWidth  + 'px';
+  canvas.style.height = els.video.offsetHeight + 'px';
+}
 
-    // コイン音初期化
-    function initCoinSound() {
-        coinSound = new Audio('/static/coin.mp3');
-        coinSound.volume = 0.5;
+// ===== ゲーム開始 =====
+function startGame() {
+  setPhase('playing');
+  pickNextEmotion();
+
+  // タイマー
+  gameState.timerInterval = setInterval(() => {
+    gameState.timeLeft--;
+    els.timer.textContent = gameState.timeLeft;
+
+    if (gameState.timeLeft <= 5) {
+      els.timer.style.color = '#e74c3c';
+      els.timer.style.animation = 'pulse 0.5s ease infinite';
+    }
+    if (gameState.timeLeft <= 0) {
+      endGame();
+    }
+  }, 1000);
+
+  // 絵文字切替
+  gameState.emotionInterval = setInterval(pickNextEmotion, EMOTION_INTERVAL);
+
+  // 表情検出
+  gameState.detectionInterval = setInterval(detectExpression, DETECTION_INTERVAL);
+}
+
+// ===== ターゲット絵文字選択 =====
+function pickNextEmotion() {
+  const current = gameState.targetEmotion;
+  let next;
+  do {
+    next = EMOTIONS[Math.floor(Math.random() * EMOTIONS.length)];
+  } while (next === current);
+
+  gameState.targetEmotion = next;
+  gameState.consecutiveMatch = 0;
+
+  els.targetEmotion.textContent = next.label;
+  els.targetEmoji.textContent   = next.emoji;
+  els.targetEmoji.style.animation = 'none';
+  requestAnimationFrame(() => {
+    els.targetEmoji.style.animation = 'bounce 0.4s ease';
+  });
+}
+
+// ===== 表情検出 =====
+async function detectExpression() {
+  if (gameState.phase !== 'playing') return;
+  if (els.video.readyState < 2) return;
+
+  try {
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 });
+    const result  = await faceapi
+      .detectSingleFace(els.video, options)
+      .withFaceExpressions();
+
+    const ctx = els.overlayCanvas.getContext('2d');
+    ctx.clearRect(0, 0, els.overlayCanvas.width, els.overlayCanvas.height);
+
+    if (!result) {
+      els.detectedEmotion.textContent = '顔なし';
+      els.detectedEmoji.textContent   = '🔍';
+      els.matchStatus.textContent     = '顔を映してください';
+      els.matchStatus.className       = 'match-status';
+      return;
     }
 
-    function playCoinSound() {
-        try {
-            if (!coinSound) initCoinSound();
-            coinSound.currentTime = 0;
-            coinSound.play();
-        } catch (e) {
-            // Web Audio APIフォールバック
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillator.frequency.value = 1200;
-                gainNode.gain.value = 0.3;
-                oscillator.start();
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (e2) {
-                console.error('Sound error:', e2);
-            }
-        }
+    // 顔枠描画
+    drawFaceBox(ctx, result.detection.box);
+
+    // 最優勢表情
+    const expressions   = result.expressions;
+    const dominant      = getDominantEmotion(expressions);
+    const target        = gameState.targetEmotion;
+
+    gameState.detectCount++;
+    els.detectCount.textContent = gameState.detectCount;
+
+    // 表示更新
+    const emotionInfo = EMOTIONS.find(e => e.id === dominant.id) || { emoji: '😐', label: dominant.id };
+    els.detectedEmotion.textContent = emotionInfo.label;
+    els.detectedEmoji.textContent   = emotionInfo.emoji;
+
+    // 合致判定
+    const isMatch = dominant.id === target.id && dominant.score >= target.threshold;
+
+    if (isMatch) {
+      gameState.consecutiveMatch++;
+      if (gameState.consecutiveMatch >= MATCH_FRAMES) {
+        gameState.consecutiveMatch = 0;
+        addCoins(COINS_PER_MATCH);
+        gameState.matchCount++;
+        els.matchCount.textContent = gameState.matchCount;
+        triggerMatchEffect();
+      }
+      els.matchStatus.textContent = '✓ マッチ！';
+      els.matchStatus.className   = 'match-status match';
+    } else {
+      gameState.consecutiveMatch = 0;
+      els.matchStatus.textContent = '✗ 違う…';
+      els.matchStatus.className   = 'match-status no-match';
     }
 
-    // UX 向上：トースト表示、振動フィードバック、コインアニメーション
-    function showToast(message, duration = 3000) {
-        let toast = document.getElementById('toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'toast';
-            toast.className = 'toast';
-            document.body.appendChild(toast);
-        }
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), duration);
-    }
+    // 合致率更新
+    const rate = gameState.detectCount > 0
+      ? Math.round((gameState.matchCount / gameState.detectCount) * 100)
+      : 0;
+    els.matchRate.textContent = rate + '%';
 
-    function vibrate(pattern = [50]) {
-        if (navigator.vibrate) {
-            navigator.vibrate(pattern);
-        }
-    }
+  } catch (err) {
+    console.warn('検出エラー:', err);
+  }
+}
 
-    function addCoin() {
-        const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
-        const newCoins = coins + 1;
-        localStorage.setItem('kidoairaku_coins', newCoins.toString());
-        
-        // コイン表示のアニメーション
-        const coinEl = document.querySelector('.coin-display');
-        if (coinEl) {
-            coinEl.classList.remove('coin-pop');
-            void coinEl.offsetWidth; // リフロー強制でアニメーション再トリガー
-            coinEl.classList.add('coin-pop');
-        }
-        
-        updateCoinDisplay();
-        playCoinSound();
-        vibrate([30]); // 軽い振動
-        showToast('+1 💰', 1500);
-    }
+function getDominantEmotion(expressions) {
+  let best = { id: 'neutral', score: 0 };
+  for (const [id, score] of Object.entries(expressions)) {
+    if (score > best.score) best = { id, score };
+  }
+  return best;
+}
 
-    function updateCoinDisplay() {
-        const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
-        const el = document.getElementById('coinCount');
-        if (el) {
-            // カウントアップアニメーション
-            const current = parseInt(el.textContent) || 0;
-            if (current !== coins) {
-                el.textContent = coins;
-            }
-        }
-    }
+function drawFaceBox(ctx, box) {
+  const scaleX = els.overlayCanvas.width  / els.video.videoWidth;
+  const scaleY = els.overlayCanvas.height / els.video.videoHeight;
+  const x = box.x * scaleX;
+  const y = box.y * scaleY;
+  const w = box.width  * scaleX;
+  const h = box.height * scaleY;
 
-    // ローディング表示の制御
-    function showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = show ? 'flex' : 'none';
-        }
-    }
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth   = 3;
+  ctx.shadowColor = '#ffd700';
+  ctx.shadowBlur  = 8;
+  ctx.strokeRect(x, y, w, h);
 
-    async function initCamera() {
-        try {
-            // カメラ起動前にローディング表示
-            showLoading(true);
-            
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: facingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 }
-                }
-            });
-            const video = document.getElementById('gameCameraPreview');
-            const canvas = document.getElementById('overlayCanvas');
-            video.srcObject = stream;
-            if (facingMode === 'user') {
-                video.style.transform = 'scaleX(-1)';
-                canvas.style.transform = 'scaleX(-1)';
-            }
-            document.getElementById('gameCameraArea').classList.add('show');
+  // 四隅アクセント
+  const c = 20;
+  ctx.lineWidth = 4;
+  [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(([px, py], i) => {
+    ctx.beginPath();
+    ctx.moveTo(px + (i % 2 === 0 ? c : -c), py);
+    ctx.lineTo(px, py);
+    ctx.lineTo(px, py + (i < 2 ? c : -c));
+    ctx.stroke();
+  });
+  ctx.shadowBlur = 0;
+}
 
-            video.addEventListener('loadedmetadata', () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.style.width = video.offsetWidth + 'px';
-                canvas.style.height = video.offsetHeight + 'px';
-                overlayCtx = canvas.getContext('2d');
-                
-                // カメラ準備完了後、ローディングを解除
-                showLoading(false);
-            });
+// ===== コイン加算 =====
+function addCoins(amount) {
+  gameState.coins += amount;
+  els.coinCount.textContent = gameState.coins;
+  els.coinCount.style.animation = 'none';
+  requestAnimationFrame(() => {
+    els.coinCount.style.animation = 'coinPop 0.3s ease';
+  });
+}
 
-            startGame();
-        } catch (err) {
-            showLoading(false);
-            showToast('カメラが起動できません：' + err.message, 5000);
-            vibrate([100, 50, 100]); // エラー時は長めの振動
-        }
-    }
+function triggerMatchEffect() {
+  els.detectedEmoji.style.animation = 'none';
+  requestAnimationFrame(() => {
+    els.detectedEmoji.style.animation = 'matchPop 0.4s ease';
+  });
+}
 
-    initCamera();
+// ===== ゲーム終了 =====
+function endGame() {
+  setPhase('result');
 
-    async function startGame() {
-        const emotions = Object.keys(EMOJI_MAP);
-        targetEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-        document.getElementById('targetEmotion').textContent = targetEmotion;
-        document.getElementById('targetEmoji').textContent = EMOJI_MAP[targetEmotion];
+  clearInterval(gameState.timerInterval);
+  clearInterval(gameState.emotionInterval);
+  clearInterval(gameState.detectionInterval);
 
-        gameData.targetEmotion = targetEmotion;
-        gameData.startTime = Date.now();
-        gameActive = true;
-        timeLeft = 30;
+  if (gameState.stream) {
+    gameState.stream.getTracks().forEach(t => t.stop());
+  }
 
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            document.getElementById('timer').textContent = timeLeft;
-            if (timeLeft <= 0) {
-                endGame();
-            }
-        }, 1000);
+  const rate   = gameState.detectCount > 0
+    ? Math.round((gameState.matchCount / gameState.detectCount) * 100) : 0;
+  const score  = gameState.coins;
+  const rank   = getScoreRank(score);
 
-        detectInterval = setInterval(detectExpression, 1000);
-        setTimeout(detectExpression, 500);
-    }
+  els.scoreNumber.textContent = score + ' コイン';
+  els.scoreRank.textContent   = rank.label;
+  els.scoreComment.textContent = rank.comment;
+  els.highlights.innerHTML    = buildHighlights(rate);
 
-    async function detectExpression() {
-        if (!gameActive || !stream) return;
+  setTimeout(() => {
+    els.resultOverlay.classList.add('show');
+  }, 400);
+}
 
-        const video = document.getElementById('gameCameraPreview');
-        const canvas = document.getElementById('gameCaptureCanvas');
-        
-        // リサイズ：最大 640x480 に抑える
-        const maxWidth = 640;
-        const maxHeight = 480;
-        let width = video.videoWidth;
-        let height = video.videoHeight;
-        
-        if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.floor(width * ratio);
-            height = Math.floor(height * ratio);
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (facingMode === 'user') {
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-        }
-        ctx.drawImage(video, 0, 0, width, height);
+function getScoreRank(score) {
+  if (score >= 200) return { label: '🏆 SS', comment: '完璧な演技力！表情の達人です！' };
+  if (score >= 150) return { label: '🥇 S',  comment: '素晴らしい！感情表現が豊かです！' };
+  if (score >= 100) return { label: '🥈 A',  comment: 'なかなかの演技力！練習すればもっと上達できます！' };
+  if (score >= 60)  return { label: '🥉 B',  comment: '平均的な演技力。表情を大げさにしてみよう！' };
+  if (score >= 30)  return { label: '😅 C',  comment: 'まだまだ練習が必要です。カメラをしっかり見て！' };
+  return              { label: '😶 D',  comment: '表情を作るのが難しかったですか？もう一度挑戦！' };
+}
 
-        canvas.toBlob(async function(blob) {
-            const formData = new FormData();
-            formData.append('image', blob, 'capture.jpg');
+function buildHighlights(rate) {
+  return `
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px">
+      ${[
+        ['合致回数', gameState.matchCount + '回'],
+        ['検出回数', gameState.detectCount + '回'],
+        ['合致率',   rate + '%'],
+      ].map(([k, v]) => `
+        <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 18px;min-width:90px;text-align:center">
+          <div style="font-size:12px;opacity:0.75">${k}</div>
+          <div style="font-size:22px;font-weight:700">${v}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
 
-            try {
-                const response = await fetch('/detect', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
+// ===== ユーティリティ =====
+function setPhase(phase) {
+  gameState.phase = phase;
+}
 
-                if (data.emotion) {
-                    const detected = data.emotion;
-                    document.getElementById('detectedEmotion').textContent = detected;
-                    document.getElementById('detectedEmoji').textContent = data.emoji || '😐';
+function showStatus(msg) {
+  const existing = document.getElementById('statusMsg');
+  if (existing) existing.remove();
+  const el = document.createElement('p');
+  el.id = 'statusMsg';
+  el.style.cssText = 'text-align:center;padding:20px;color:#b8860b;font-size:14px;';
+  el.textContent = msg;
+  document.querySelector('.container').appendChild(el);
+}
 
-                    const isMatch = detected === targetEmotion;
-                    document.getElementById('matchStatus').textContent = isMatch ? '合致！+1💰' : '違う...';
-                    document.getElementById('matchStatus').className = 'match-status ' + (isMatch ? 'match' : 'no-match');
+// ===== CSS アニメーション追加 =====
+const style = document.createElement('style');
+style.textContent = `
+@keyframes bounce {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.15); }
+}
+@keyframes coinPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.2); color: #e67e00; }
+  100% { transform: scale(1); }
+}
+@keyframes matchPop {
+  0%   { transform: scale(1) rotate(0deg); }
+  30%  { transform: scale(1.5) rotate(-10deg); }
+  60%  { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+`;
+document.head.appendChild(style);
 
-                    const detection = {
-                        time: Date.now() - gameData.startTime,
-                        target: targetEmotion,
-                        detected: detected,
-                        match: isMatch
-                    };
-                    gameData.detections.push(detection);
-                    gameData.detectCount++;
-                    if (isMatch) {
-                        gameData.matchCount++;
-                        gameData.totalMatchTime += 1;
-                        addCoin();
-                    }
-
-                    document.getElementById('detectCount').textContent = gameData.detectCount;
-                    document.getElementById('matchCount').textContent = gameData.matchCount;
-                    const rate = gameData.detectCount > 0 ? Math.round((gameData.matchCount / gameData.detectCount) * 100) : 0;
-                    document.getElementById('matchRate').textContent = rate + '%';
-
-                    drawEmojiOnFace(detected);
-                }
-            } catch (err) {
-                console.error('検出エラー:', err);
-                // エラー時も続行
-            }
-        }, 'image/jpeg', 0.7); // 圧縮品質を 0.7 に低下（サイズ削減）
-    }
-
-    function drawEmojiOnFace(emotion) {
-        if (!overlayCtx) return;
-        const canvas = document.getElementById('overlayCanvas');
-        overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
-        const emoji = EMOJI_MAP[emotion] || '😐';
-        overlayCtx.font = '120px serif';
-        overlayCtx.textAlign = 'center';
-        overlayCtx.textBaseline = 'middle';
-        overlayCtx.fillText(emoji, canvas.width / 2, canvas.height / 2);
-    }
-
-    async function endGame() {
-        gameActive = false;
-        clearInterval(timerInterval);
-        clearInterval(detectInterval);
-
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-
-        document.getElementById('gameCameraArea').classList.remove('show');
-        document.getElementById('gameStats').style.display = 'none';
-
-        gameData.endTime = Date.now();
-
-        try {
-            const response = await fetch('/game/score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameData: gameData })
-            });
-            const result = await response.json();
-
-            document.getElementById('scoreNumber').textContent = result.score || '-';
-            document.getElementById('scoreRank').textContent = result.rank || '-';
-            document.getElementById('scoreComment').textContent = result.comment || '';
-
-            const highlightsEl = document.getElementById('highlights');
-            highlightsEl.innerHTML = '';
-            if (result.highlights) {
-                result.highlights.forEach(h => {
-                    const li = document.createElement('li');
-                    li.textContent = h;
-                    highlightsEl.appendChild(li);
-                });
-            }
-
-            // ローディング解除後に結果表示
-            showLoading(false);
-            document.getElementById('gameResultOverlay').classList.add('show');
-            
-            // 結果表示時に祝賀の振動
-            vibrate([200, 100, 200]);
-            showToast('🎉 採点完了！', 2000);
-        } catch (err) {
-            showLoading(false);
-            showToast('採点エラー：' + err.message, 5000);
-            vibrate([100, 50, 100]);
-        }
-    }
-
-    updateCoinDisplay();
+// ===== エントリーポイント =====
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof faceapi === 'undefined') {
+    showStatus('face-api.js が読み込まれていません。');
+    return;
+  }
+  loadModels();
 });
