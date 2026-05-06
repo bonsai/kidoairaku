@@ -55,27 +55,75 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // UX 向上：トースト表示、振動フィードバック、コインアニメーション
+    function showToast(message, duration = 3000) {
+        let toast = document.getElementById('toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.className = 'toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    function vibrate(pattern = [50]) {
+        if (navigator.vibrate) {
+            navigator.vibrate(pattern);
+        }
+    }
+
     function addCoin() {
         const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
         const newCoins = coins + 1;
         localStorage.setItem('kidoairaku_coins', newCoins.toString());
+        
+        // コイン表示のアニメーション
+        const coinEl = document.querySelector('.coin-display');
+        if (coinEl) {
+            coinEl.classList.remove('coin-pop');
+            void coinEl.offsetWidth; // リフロー強制でアニメーション再トリガー
+            coinEl.classList.add('coin-pop');
+        }
+        
         updateCoinDisplay();
         playCoinSound();
+        vibrate([30]); // 軽い振動
+        showToast('+1 💰', 1500);
     }
 
     function updateCoinDisplay() {
         const coins = parseInt(localStorage.getItem('kidoairaku_coins') || '0');
         const el = document.getElementById('coinCount');
-        if (el) el.textContent = coins;
+        if (el) {
+            // カウントアップアニメーション
+            const current = parseInt(el.textContent) || 0;
+            if (current !== coins) {
+                el.textContent = coins;
+            }
+        }
+    }
+
+    // ローディング表示の制御
+    function showLoading(show) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = show ? 'flex' : 'none';
+        }
     }
 
     async function initCamera() {
         try {
+            // カメラ起動前にローディング表示
+            showLoading(true);
+            
             stream = await navigator.mediaDevices.getUserMedia({
                 video: { 
                     facingMode: facingMode, 
-                    width: { ideal: 1280, max: 1280 }, 
-                    height: { ideal: 720, max: 720 }
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }
                 }
             });
             const video = document.getElementById('gameCameraPreview');
@@ -93,11 +141,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 canvas.style.width = video.offsetWidth + 'px';
                 canvas.style.height = video.offsetHeight + 'px';
                 overlayCtx = canvas.getContext('2d');
+                
+                // カメラ準備完了後、ローディングを解除
+                showLoading(false);
             });
 
             startGame();
         } catch (err) {
-            alert('カメラが起動できません: ' + err.message);
+            showLoading(false);
+            showToast('カメラが起動できません：' + err.message, 5000);
+            vibrate([100, 50, 100]); // エラー時は長めの振動
         }
     }
 
@@ -248,9 +301,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
+            // ローディング解除後に結果表示
+            showLoading(false);
             document.getElementById('gameResultOverlay').classList.add('show');
+            
+            // 結果表示時に祝賀の振動
+            vibrate([200, 100, 200]);
+            showToast('🎉 採点完了！', 2000);
         } catch (err) {
-            alert('採点エラー: ' + err.message);
+            showLoading(false);
+            showToast('採点エラー：' + err.message, 5000);
+            vibrate([100, 50, 100]);
         }
     }
 
