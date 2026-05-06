@@ -1,5 +1,5 @@
 // ===== 設定 =====
-const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights';
 const GAME_DURATION = 30;          // 秒
 const EMOTION_INTERVAL = 3000;     // 3秒ごとに絵文字切替
 const DETECTION_INTERVAL = 200;    // 0.2秒ごとに検出
